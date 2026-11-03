@@ -1,0 +1,24 @@
+{
+  "schema": "video_collect.vendor.v1",
+  "projects": [
+    {
+      "name": "xiaohongshu-mcp-search-state-snippet",
+      "repository_url": "https://github.com/xpzouying/xiaohongshu-mcp",
+      "commit": "7797fd375aba02dcd33afe143f6bee13e5870859",
+      "license": "Apache-2.0",
+      "upstream_paths": ["xiaohongshu/search.go"],
+      "local_paths": [
+        "src/video_collect/platforms/xiaohongshu/search_state.js",
+        "src/video_collect/platforms/xiaohongshu/LICENSE.apache-2.0",
+        "src/video_collect/platforms/xiaohongshu/UPSTREAM.md"
+      ],
+      "reuse_form": "adapted_javascript_snippet",
+      "modifications": [
+        "Return the deserialized feed array directly to Playwright",
+        "Support Vue _rawValue as well as value and _value"
+      ],
+      "verified_at": "2026-10-28",
+      "verification": "Local parser tests passed; live anonymous search is blocked by platform IP-risk page 300012"
+    }
+  ]
+}

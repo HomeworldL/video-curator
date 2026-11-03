@@ -1,0 +1,13 @@
+# 只保存平台会话、网络和本机环境；阶段参数放在主题 YAML。
+dataset_root: ../datasets
+platforms:
+  youtube:
+    search_mode: native
+  bilibili:
+    search_mode: native
+    request_interval_seconds: 2
+  douyin:
+    search_mode: web
+  xiaohongshu:
+    search_mode: web
+timeout_seconds: 30
