@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from video_collect import jobs, metadata, search
-from video_collect.cli import main
-from video_collect.identity import identify
-from video_collect.models import CollectionError
+from video_curator import jobs, metadata, search
+from video_curator.cli import main
+from video_curator.identity import identify
+from video_curator.models import CollectionError
 
 
 def seed(job):
@@ -36,7 +36,7 @@ def test_risk_stops_remaining_metadata_and_resumes(collection, monkeypatch, caps
             update={"identity": identify(candidate.url), "access_url": candidate.url}
         )
 
-    monkeypatch.setattr("video_collect.metadata.fetch", fetch)
+    monkeypatch.setattr("video_curator.metadata.fetch", fetch)
     assert main(["metadata", "--input", str(job.root)]) == 2
     summary = json.loads(capsys.readouterr().out)
     assert summary["stopped"] == code and summary["status"] == "partial"
@@ -64,7 +64,7 @@ def test_interrupt_publishes_before_fifty_rows(collection, monkeypatch, capsys):
             update={"identity": identify(candidate.url), "access_url": candidate.url}
         )
 
-    monkeypatch.setattr("video_collect.metadata.fetch", fetch)
+    monkeypatch.setattr("video_curator.metadata.fetch", fetch)
     assert main(["metadata", "--input", str(job.root)]) == 130
     summary = json.loads(capsys.readouterr().out)
     assert summary["stopped"] == "interrupted"
@@ -82,7 +82,7 @@ def test_three_transient_failures_stop_and_no_download_starts(collection, monkey
         requested.append(candidate.url)
         raise CollectionError("timeout", "metadata")
 
-    monkeypatch.setattr("video_collect.metadata.fetch", fetch)
+    monkeypatch.setattr("video_curator.metadata.fetch", fetch)
     with (
         job.exclusive(),
         pytest.raises(CollectionError, match="consecutive_metadata_failures"),
@@ -93,8 +93,8 @@ def test_three_transient_failures_stop_and_no_download_starts(collection, monkey
 
 
 def test_request_spacing_is_also_passed_to_ytdlp():
-    from video_collect.config import Runtime
-    from video_collect.providers.ytdlp import options
+    from video_curator.config import Runtime
+    from video_curator.providers.ytdlp import options
 
     runtime = Runtime()
     assert options(runtime.platforms["bilibili"], runtime)["sleep_interval_requests"] == 2

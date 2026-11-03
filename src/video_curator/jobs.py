@@ -17,7 +17,7 @@ from .config import Runtime, Topic
 from .models import CollectionError
 from .state import State, now
 
-SCHEMA = "video_collect.task.v2"
+SCHEMA = "video_curator.task.v2"
 
 
 @lru_cache(maxsize=1)

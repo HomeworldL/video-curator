@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "video-collect"
+name = "video-curator"
 version = "0.1.0"
 description = "Topic-driven multi-platform discovery and screening of original videos"
 readme = "README.md"
@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-video-collect = "video_collect.cli:main"
+video-curator = "video_curator.cli:main"
 
 [project.optional-dependencies]
 browser = ["playwright>=1.50,<2"]
@@ -28,7 +28,7 @@ browser = ["playwright>=1.50,<2"]
 dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/video_collect"]
+packages = ["src/video_curator"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -4,10 +4,10 @@ from urllib.parse import quote
 
 import pytest
 
-from video_collect.config import Runtime
-from video_collect.models import CollectionError, Platform, SearchRequest
-from video_collect.platforms.douyin.parsing import parse_video, video_records
-from video_collect.platforms.douyin.session import (
+from video_curator.config import Runtime
+from video_curator.models import CollectionError, Platform, SearchRequest
+from video_curator.platforms.douyin.parsing import parse_video, video_records
+from video_curator.platforms.douyin.session import (
     detail_response_url,
     gate_code,
     page_gate,
@@ -130,7 +130,7 @@ class Active:
 
 
 def test_native_query_returns_only_page_video_records(monkeypatch):
-    module = import_module("video_collect.platforms.douyin.search")
+    module = import_module("video_curator.platforms.douyin.search")
     active = Active(
         Response({"status_code": 0, "data": [{"aweme_info": video_record()}], "has_more": False})
     )
@@ -150,7 +150,7 @@ def test_native_query_returns_only_page_video_records(monkeypatch):
 
 
 def test_missing_or_blocked_response_is_not_successful_empty_search(monkeypatch):
-    module = import_module("video_collect.platforms.douyin.search")
+    module = import_module("video_curator.platforms.douyin.search")
     active = Active(Response({"status_code": 8, "data": []}))
 
     @contextmanager
@@ -168,7 +168,7 @@ def test_missing_or_blocked_response_is_not_successful_empty_search(monkeypatch)
 def test_public_share_hydration_null_renditions_and_exact_identity():
     import json
 
-    from video_collect.platforms.douyin.share import parse_share
+    from video_curator.platforms.douyin.share import parse_share
 
     record = video_record()
     record["video"]["bit_rate"] = None
@@ -185,7 +185,7 @@ def test_public_share_hydration_null_renditions_and_exact_identity():
 
 
 def test_public_share_gate_and_missing_state_are_not_empty_metadata():
-    from video_collect.platforms.douyin.share import parse_share
+    from video_curator.platforms.douyin.share import parse_share
 
     with pytest.raises(CollectionError, match="verification_required"):
         parse_share("<html><title>验证码中间页</title></html>", ID)
@@ -197,7 +197,7 @@ def test_public_share_initializes_only_new_visitor_and_reloads_once(monkeypatch)
     import json
     from http.cookiejar import Cookie
 
-    from video_collect.platforms.douyin import share
+    from video_curator.platforms.douyin import share
 
     empty = '<script>window._ROUTER_DATA = {"loaderData": {}};</script>'
     full = (

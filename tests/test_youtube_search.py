@@ -1,8 +1,8 @@
 import pytest
 
-from video_collect.config import Runtime
-from video_collect.models import CollectionError, SearchRequest
-from video_collect.platforms.youtube import search as native
+from video_curator.config import Runtime
+from video_curator.models import CollectionError, SearchRequest
+from video_curator.platforms.youtube import search as native
 
 
 def request(**changes):

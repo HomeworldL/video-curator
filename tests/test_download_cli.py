@@ -1,8 +1,8 @@
 import pytest
 
-from video_collect import download, jobs
-from video_collect.cli import main
-from video_collect.config import Runtime, Topic
+from video_curator import download, jobs
+from video_curator.cli import main
+from video_curator.config import Runtime, Topic
 
 
 def test_download_overrides_are_optional_and_not_persisted(tmp_path, monkeypatch):

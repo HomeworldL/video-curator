@@ -6,13 +6,13 @@ import httpx
 import pytest
 import yaml
 
-from video_collect import download, export, filtering, jobs, metadata, search
-from video_collect.cli import main
-from video_collect.config import Runtime, Topic
-from video_collect.identity import identify
-from video_collect.jobs import Job
-from video_collect.models import Candidate, CollectionError, VideoMetadata
-from video_collect.providers import doubao
+from video_curator import download, export, filtering, jobs, metadata, search
+from video_curator.cli import main
+from video_curator.config import Runtime, Topic
+from video_curator.identity import identify
+from video_curator.jobs import Job
+from video_curator.models import Candidate, CollectionError, VideoMetadata
+from video_curator.providers import doubao
 
 
 def envelope(results):
@@ -334,7 +334,7 @@ def test_cli_new_prompt_for_old_snapshot_and_saved_filter_config(setup, tmp_path
 
 
 def test_provider_text_only_no_thinking_no_tools(monkeypatch):
-    from video_collect.config import FilterSettings
+    from video_curator.config import FilterSettings
 
     captured = []
     monkeypatch.setenv("ARK_API_KEY", "fake")
@@ -682,7 +682,7 @@ def test_cli_concurrency_overrides_saved_settings(setup, capsys):
 def test_ctrl_c_stops_scheduling_but_drains_inflight_requests(setup, monkeypatch):
     import threading
 
-    from video_collect import filtering as filter_module
+    from video_curator import filtering as filter_module
 
     job, calls, add = setup
     add(6)

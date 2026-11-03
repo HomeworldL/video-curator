@@ -5,21 +5,21 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
-from video_collect.config import Runtime
-from video_collect.identity import identify
-from video_collect.media import inspect
-from video_collect.models import (
+from video_curator.config import Runtime
+from video_curator.identity import identify
+from video_curator.media import inspect
+from video_curator.models import (
     Candidate,
     CollectionError,
     DownloadRequest,
     SearchRequest,
     VideoMetadata,
 )
-from video_collect.platforms.xiaohongshu import download as download_module
-from video_collect.platforms.xiaohongshu import search as search_module
-from video_collect.platforms.xiaohongshu.detail import formats_from_note, media_url, normalize_note
-from video_collect.platforms.xiaohongshu.search import candidates_from_feeds
-from video_collect.platforms.xiaohongshu.session import access_issue
+from video_curator.platforms.xiaohongshu import download as download_module
+from video_curator.platforms.xiaohongshu import search as search_module
+from video_curator.platforms.xiaohongshu.detail import formats_from_note, media_url, normalize_note
+from video_curator.platforms.xiaohongshu.search import candidates_from_feeds
+from video_curator.platforms.xiaohongshu.session import access_issue
 
 NOTE_ID = "674051740000000007027a15"
 URL = f"https://www.xiaohongshu.com/explore/{NOTE_ID}?xsec_token=example"

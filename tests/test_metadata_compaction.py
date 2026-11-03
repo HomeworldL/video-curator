@@ -2,10 +2,10 @@ import shutil
 
 import pytest
 
-from video_collect import export, jobs, metadata, search
-from video_collect.config import Runtime, Topic
-from video_collect.jobs import Job
-from video_collect.models import Candidate, CollectionError
+from video_curator import export, jobs, metadata, search
+from video_curator.config import Runtime, Topic
+from video_curator.jobs import Job
+from video_curator.models import Candidate, CollectionError
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,6 @@
 # video-curator
 
-按主题发现、筛选和整理视频素材，为动作恢复、角色动画及其他视频数据集任务准备数据。Labubu 是当前测试主题；Python 包名仍为 `video_collect`。
+按主题发现、筛选和整理视频素材，为动作恢复、角色动画及其他视频数据集任务准备数据。Labubu 是当前测试主题；Python 包名为 `video_curator`，命令入口为 `video-curator`。
 
 ## 当前流程
 
@@ -25,19 +25,19 @@ uv sync
 
 ```bash
 # 搜索：读取主题中全部关键词
-uv run python -m video_collect.cli search \
+uv run python -m video_curator.cli search \
   --topic configs/topics/labubu.yaml --platform bilibili --mode native \
   --all-pages --page-size 50 --output datasets/labubu-bilibili
 
-uv run python -m video_collect.cli metadata --input datasets/labubu-bilibili
+uv run python -m video_curator.cli metadata --input datasets/labubu-bilibili
 
-uv run python -m video_collect.cli filter \
+uv run python -m video_curator.cli filter \
   --input datasets/labubu-bilibili --topic configs/topics/labubu.yaml
 
-uv run python -m video_collect.cli screen \
+uv run python -m video_curator.cli screen \
   --input datasets/labubu-bilibili --topic configs/topics/labubu.yaml --workers 2
 
-uv run python -m video_collect.cli download \
+uv run python -m video_curator.cli download \
   --input datasets/labubu-bilibili --limit 40 --resolution 720
 ```
 
@@ -48,16 +48,17 @@ uv run python -m video_collect.cli download \
 ## 查看数据
 
 ```bash
-uv run python scripts/serve_dataset_viewer.py --input datasets/labubu-bilibili
+uv run python scripts/dataset_viewer.py --input datasets/labubu-bilibili
 ```
 
-默认打开 `http://127.0.0.1:8765/`（端口占用时以终端地址为准）。网页只读 SQLite，每 10 秒刷新，不调用模型；按 `Ctrl+C` 关闭。
+加 `--output tmp/dataset-viewer.html` 可导出静态快照。默认打开 `http://127.0.0.1:8765/`（端口占用时以终端地址为准）。网页只读 SQLite，每 10 秒刷新，不调用模型；按 `Ctrl+C` 关闭。
 
 每个任务主要包含 `videos.jsonl`、`task.json`、`.state/`、`evidence/` 和 `raw/`。当前视频格式为 v3，阶段结果持续补充；不要手工修改 JSONL 绕过数据库。后处理拟使用独立的 `clips.jsonl`。
 
 ## 开发与交接
 
-- 公共阶段：`src/video_collect/`；平台实现：`platforms/`；外部后端：`providers/`。
+- 开发入口与注意事项见 [AGENTS.md](AGENTS.md)。
+- 公共阶段：`src/video_curator/`；平台实现：`platforms/`；外部后端：`providers/`。
 - 现有交接、研究和历史说明存放在本地 `docs/internal/`，不纳入 Git；目前暂无独立的对外文档。
 
 ```bash

@@ -1,10 +1,10 @@
 import httpx
 import pytest
 
-from video_collect import download, metadata
-from video_collect.config import Runtime
-from video_collect.models import Candidate, CollectionError, DownloadRequest
-from video_collect.platforms.bilibili import detail as module
+from video_curator import download, metadata
+from video_curator.config import Runtime
+from video_curator.models import Candidate, CollectionError, DownloadRequest
+from video_curator.platforms.bilibili import detail as module
 
 BV = "BV17x411w7KC"
 URL = f"https://www.bilibili.com/video/{BV}"

@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from video_collect import download, export, media, metadata, search
-from video_collect.jobs import Job
-from video_collect.models import CollectionError
+from video_curator import download, export, media, metadata, search
+from video_curator.jobs import Job
+from video_curator.models import CollectionError
 
 
 def test_download_without_model_prompt_key_or_frame_extraction(collection, monkeypatch):
@@ -16,8 +16,8 @@ def test_download_without_model_prompt_key_or_frame_extraction(collection, monke
     def unexpected(*args, **kwargs):
         pytest.fail("Collection must not prepare visual evidence or call the VLM")
 
-    monkeypatch.setattr("video_collect.preview.obtain", unexpected)
-    monkeypatch.setattr("video_collect.providers.doubao.complete_screen", unexpected)
+    monkeypatch.setattr("video_curator.preview.obtain", unexpected)
+    monkeypatch.setattr("video_curator.providers.doubao.complete_screen", unexpected)
     search.import_urls(job, [details.access_url])
     with job.exclusive():
         metadata.run(job, 10**9, missing_only=True)
@@ -49,11 +49,11 @@ def test_download_crash_after_archive_resumes_without_duplicate_download(collect
         archive(*args)
         raise CollectionError("simulated_interruption", "media")
 
-    monkeypatch.setattr("video_collect.media.archive", archive_then_interrupt)
+    monkeypatch.setattr("video_curator.media.archive", archive_then_interrupt)
     with job.exclusive():
         metadata.run(job, 10**9, missing_only=True)
         assert download.run(job, 10)["outcomes"] == {"technical_error": 1}
-    monkeypatch.setattr("video_collect.media.archive", archive)
+    monkeypatch.setattr("video_curator.media.archive", archive)
     restarted = Job(job.topic, job.runtime)
     with restarted.exclusive():
         metadata.run(restarted, 10**9, missing_only=True)
@@ -79,7 +79,7 @@ def test_inventory_export_rejects_changed_media(collection):
 def test_cli_download_works_without_prompt_or_api_key(collection, monkeypatch, capsys):
     import yaml
 
-    from video_collect.cli import main
+    from video_curator.cli import main
 
     job, details, _ = collection
     search.import_urls(job, [details.access_url])
@@ -122,7 +122,7 @@ def test_download_skips_missing_details_before_limit_without_fetching(collection
     def forbidden(*args, **kwargs):
         pytest.fail("download must not fetch metadata implicitly")
 
-    monkeypatch.setattr("video_collect.metadata.fetch", forbidden)
+    monkeypatch.setattr("video_curator.metadata.fetch", forbidden)
     with job.exclusive():
         result = download.run(job, 1)
     assert result["outcomes"] == {"downloaded": 1}

@@ -3,10 +3,10 @@ import shutil
 
 import yaml
 
-from video_collect import search
-from video_collect.cli import main
-from video_collect.identity import identify
-from video_collect.models import Candidate, SearchBatch, VideoMetadata
+from video_curator import search
+from video_curator.cli import main
+from video_curator.identity import identify
+from video_curator.models import Candidate, SearchBatch, VideoMetadata
 
 
 def config_files(job, parent):
@@ -89,7 +89,7 @@ def test_cli_job_search_resume_metadata_and_download_handoff(
             duration_seconds=2,
         )
 
-    monkeypatch.setattr("video_collect.metadata.fetch", fetch)
+    monkeypatch.setattr("video_curator.metadata.fetch", fetch)
     assert main(["metadata", "--input", str(root)]) == 0
     capsys.readouterr()
     assert calls["metadata"] == 2
@@ -160,7 +160,7 @@ def test_job_metadata_processes_missing_rows_even_after_ready_limit(
     assert main(common + ["search", "--platform", "youtube", "--output", str(root)]) == 0
     capsys.readouterr()
     monkeypatch.setattr(
-        "video_collect.metadata.fetch",
+        "video_curator.metadata.fetch",
         lambda candidate, runtime: VideoMetadata(
             identity=identify(candidate.url), access_url=candidate.url, title="robot"
         ),
@@ -175,7 +175,7 @@ def test_job_metadata_processes_missing_rows_even_after_ready_limit(
 def test_partial_job_resumes_at_failed_page_and_preserves_error_history(
     collection, tmp_path, monkeypatch, capsys
 ):
-    from video_collect.models import CollectionError
+    from video_curator.models import CollectionError
 
     job, details, _ = collection
     common = config_files(job, tmp_path)
@@ -263,8 +263,8 @@ def test_cli_progress_precedes_request_and_keeps_stdout_json(
 def test_task_cache_isolated_and_invalidated_by_atomic_replacement(tmp_path, monkeypatch):
     from pathlib import Path
 
-    from video_collect import export, jobs
-    from video_collect.config import Runtime, Topic
+    from video_curator import export, jobs
+    from video_curator.config import Runtime, Topic
 
     root = tmp_path / "task"
     jobs.initialize(root, Topic(id="test"), Runtime())

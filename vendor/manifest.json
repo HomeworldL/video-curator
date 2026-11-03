@@ -1,5 +1,5 @@
 {
-  "schema": "video_collect.vendor.v1",
+  "schema": "video_curator.vendor.v1",
   "projects": [
     {
       "name": "xiaohongshu-mcp-search-state-snippet",
@@ -8,9 +8,9 @@
       "license": "Apache-2.0",
       "upstream_paths": ["xiaohongshu/search.go"],
       "local_paths": [
-        "src/video_collect/platforms/xiaohongshu/search_state.js",
-        "src/video_collect/platforms/xiaohongshu/LICENSE.apache-2.0",
-        "src/video_collect/platforms/xiaohongshu/UPSTREAM.md"
+        "src/video_curator/platforms/xiaohongshu/search_state.js",
+        "src/video_curator/platforms/xiaohongshu/LICENSE.apache-2.0",
+        "src/video_curator/platforms/xiaohongshu/UPSTREAM.md"
       ],
       "reuse_form": "adapted_javascript_snippet",
       "modifications": [

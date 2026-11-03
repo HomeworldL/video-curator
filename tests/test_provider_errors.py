@@ -1,4 +1,4 @@
-from video_collect.providers.ytdlp import _failure
+from video_curator.providers.ytdlp import _failure
 
 
 def test_fresh_visitor_cookies_do_not_imply_login_required():
@@ -23,8 +23,8 @@ def test_missing_formats_does_not_imply_login_or_irrelevance():
 def test_trial_720p_preference_handles_both_orientations():
     from yt_dlp import YoutubeDL
 
-    from video_collect.config import Runtime
-    from video_collect.providers.ytdlp import options
+    from video_curator.config import Runtime
+    from video_curator.providers.ytdlp import options
 
     runtime = Runtime()
     runtime.platforms["bilibili"].format = "bestvideo+bestaudio/best"

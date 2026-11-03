@@ -3,9 +3,9 @@ import json
 import httpx
 import pytest
 
-from video_collect.config import FilterSettings
-from video_collect.models import CollectionError
-from video_collect.providers import doubao
+from video_curator.config import FilterSettings
+from video_curator.models import CollectionError
+from video_curator.providers import doubao
 
 
 def test_429_preserves_provider_code_request_id_and_retry_after_without_secrets(monkeypatch):
@@ -123,7 +123,7 @@ def test_screen_retains_usage_for_success_and_invalid_output(
 ):
     from types import SimpleNamespace
 
-    from video_collect.config import ScreenSettings
+    from video_curator.config import ScreenSettings
 
     image = tmp_path / "contact.jpg"
     image.write_bytes(b"fixture")
@@ -166,7 +166,7 @@ def test_screen_retains_usage_for_success_and_invalid_output(
 def test_screen_transport_sends_all_numbered_images(monkeypatch, tmp_path):
     from types import SimpleNamespace
 
-    from video_collect.config import ScreenSettings
+    from video_curator.config import ScreenSettings
 
     image = tmp_path / "image.jpg"
     image.write_bytes(b"test")

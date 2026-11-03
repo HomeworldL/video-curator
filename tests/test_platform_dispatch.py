@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from video_collect import download, metadata, search
-from video_collect.config import Runtime, Topic
-from video_collect.identity import identify
-from video_collect.models import (
+from video_curator import download, metadata, search
+from video_curator.config import Runtime, Topic
+from video_curator.identity import identify
+from video_curator.models import (
     Candidate,
     CollectionError,
     DownloadRequest,
@@ -18,7 +18,7 @@ from video_collect.models import (
     SearchRequest,
     VideoMetadata,
 )
-from video_collect.providers import ytdlp
+from video_curator.providers import ytdlp
 
 
 def test_shared_search_terms_apply_to_every_platform_and_keep_optional_additions():
@@ -101,7 +101,7 @@ def test_native_access_failure_is_preserved(monkeypatch):
     ],
 )
 def test_specialized_detail_is_normalized_once(platform, url, source_id, backend, monkeypatch):
-    module = __import__(f"video_collect.platforms.{platform}.detail", fromlist=["detail"])
+    module = __import__(f"video_curator.platforms.{platform}.detail", fromlist=["detail"])
     monkeypatch.setattr(
         module,
         "detail",
@@ -134,7 +134,7 @@ def test_specialized_detail_is_normalized_once(platform, url, source_id, backend
 def test_download_uses_the_backend_that_produced_metadata(
     platform, url, backend, monkeypatch, tmp_path
 ):
-    module = __import__(f"video_collect.platforms.{platform}.download", fromlist=["download"])
+    module = __import__(f"video_curator.platforms.{platform}.download", fromlist=["download"])
     expected = DownloadResult(path=tmp_path / "source.mp4", backend=backend)
     monkeypatch.setattr(module, "download", lambda req, runtime: expected)
     details = VideoMetadata(identity=identify(url), access_url=url, raw={"_backend": backend})
@@ -196,7 +196,7 @@ def test_preparsed_download_never_reextracts_url_or_mutates_input(
 def test_cli_native_failure_has_nonzero_exit(collection, monkeypatch, tmp_path, capsys):
     import yaml
 
-    from video_collect.cli import main
+    from video_curator.cli import main
 
     job, _, _ = collection
     topic = tmp_path / "topic.yaml"
@@ -232,7 +232,7 @@ def test_cli_native_failure_has_nonzero_exit(collection, monkeypatch, tmp_path, 
 def test_xhs_shortlink_is_expanded_before_native_detail(monkeypatch):
     import httpx
 
-    from video_collect.platforms.xiaohongshu import detail as detail_module
+    from video_curator.platforms.xiaohongshu import detail as detail_module
 
     note_id = "674051740000000007027a15"
     resolved = f"https://www.xiaohongshu.com/explore/{note_id}?xsec_token=example"

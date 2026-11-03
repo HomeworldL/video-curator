@@ -1,23 +1,165 @@
 #!/usr/bin/env python3
-"""Serve a live read-only dataset viewer. No exports, model calls, or dataset writes."""
+"""Read-only dataset viewer: live SQLite by default, static HTML with --output."""
 
 import argparse
 import errno
 import hashlib
 import json
 import mimetypes
+import os
 import sqlite3
 import threading
 import webbrowser
+from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlparse, urlsplit
 
-from build_dataset_viewer import project
+from video_curator import export, screening
 
-from video_collect import export, screening
+USAGE_FIELDS = {
+    "usage",
+    "cumulative",
+    "usage_reported_calls",
+    "usage_missing_calls",
+    "calls",
+    "updated_at",
+}
+
+
+def usage_summary(stages):
+    return {
+        stage: {
+            key: value for key, value in (stages.get(stage) or {}).items() if key in USAGE_FIELDS
+        }
+        for stage in ("filter", "screen")
+    }
+
+
+def render_html(payload):
+    # Escape untrusted metadata before embedding JSON in an HTML script element.
+    data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    data = data.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+    template = Path(__file__).with_name("dataset_viewer.html").read_text(encoding="utf-8")
+    return template.replace("__DATASET_JSON__", data)
+
+
+def web_url(value):
+    return value if isinstance(value, str) and urlparse(value).scheme in {"http", "https"} else None
+
+
+def local_url(value, root, output):
+    if not value:
+        return None
+    path = (root / value).resolve()
+    if not path.is_relative_to(root) or not path.is_file():
+        return None
+    return quote(os.path.relpath(path, output.parent), safe="/")
+
+
+def project(record, root, output):
+    identity = record["identity"]
+    metadata = record["metadata"].get("data") or {}
+    hits = record["search"].get("data") or []
+    filtering = record["filter"]
+    screening = record["screening"]
+    visual = screening.get("data") or {}
+    pages = []
+    for page in visual.get("pages") or []:
+        evidence = page["evidence"]
+        pages.append(
+            {k: v for k, v in page.items() if k != "evidence"}
+            | {
+                "preview": local_url(evidence.get("path"), root, output),
+                "frames": evidence.get("frames") or [],
+                "cover_present": evidence.get("cover_present"),
+                "start_seconds": evidence["start_seconds"],
+                "end_seconds": evidence["end_seconds"],
+                "sampling": evidence["sampling"],
+            }
+        )
+    first = pages[0] if pages else {}
+    media = record["download"].get("data") or {}
+    return {
+        "id": record["record_id"],
+        "platform": identity["platform"],
+        "part": identity.get("part_id"),
+        "title": metadata.get("title")
+        or next((h.get("title") for h in hits if h.get("title")), "未获取标题"),
+        "author": metadata.get("author"),
+        "duration": metadata.get("duration_seconds"),
+        "description": metadata.get("description"),
+        "tags": metadata.get("tags") or [],
+        "queries": list(dict.fromkeys(h["query"] for h in hits if h.get("query"))),
+        "url": web_url(metadata.get("access_url") or identity.get("canonical_url")),
+        "cover": next((u for u in metadata.get("thumbnails", []) if web_url(u)), None),
+        "filter": filtering,
+        "screen": {k: v for k, v in screening.items() if k != "data"}
+        | {"data": {k: v for k, v in visual.items() if k != "pages"}},
+        "pages": pages,
+        "preview": first.get("preview"),
+        "frames": first.get("frames", []),
+        "cover_present": first.get("cover_present"),
+        "metadata_status": record["metadata"]["status"],
+        "download_status": record["download"]["status"],
+        "errors": {
+            s: record[s]["error"]
+            for s in ("search", "metadata", "filter", "screening", "download")
+            if record[s].get("error")
+        },
+        "media": local_url(media.get("path"), root, output),
+    }
+
+
+def build(source: Path, output: Path):
+    source = source.resolve()
+    source = source / "videos.jsonl" if source.is_dir() else source
+    root = source.parent
+    output = output.resolve()
+    if output.suffix.lower() != ".html":
+        raise ValueError("output must end with .html")
+    records = []
+    with source.open(encoding="utf-8") as stream:
+        for number, line in enumerate(stream, 1):
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            if record.get("schema") != "video_curator.video.v3":
+                raise ValueError(f"line {number}: expected video_curator.video.v3")
+            records.append(project(record, root, output))
+    records.sort(key=lambda r: r["id"])
+    task_path = root / "task.json"
+    task = json.loads(task_path.read_text(encoding="utf-8")) if task_path.exists() else {}
+    stages = task.get("stages") or {}
+    payload = {
+        "name": root.name,
+        "generated": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "source": str(source),
+        "usage": usage_summary(stages),
+        "records": records,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(render_html(payload), encoding="utf-8")
+    return {
+        "output": str(output),
+        "records": len(records),
+        "filter": dict(
+            Counter(
+                (r["filter"].get("data") or {}).get("decision") or r["filter"]["status"]
+                for r in records
+            )
+        ),
+        "screen": dict(
+            Counter(
+                ((r["screen"].get("data") or {}).get("grade") or "complete")
+                if r["screen"]["status"] == "complete"
+                else r["screen"]["status"]
+                for r in records
+            )
+        ),
+    }
 
 
 class ReadOnlyState:
@@ -101,22 +243,7 @@ class DatasetSource:
         if version != self.task_version:
             self.stages = json.loads(task_path.read_text()).get("stages", {}) if version else {}
             self.task_version = version
-        usage = {
-            stage: {
-                k: v
-                for k, v in (self.stages.get(stage) or {}).items()
-                if k
-                in {
-                    "usage",
-                    "cumulative",
-                    "calls",
-                    "usage_reported_calls",
-                    "usage_missing_calls",
-                    "updated_at",
-                }
-            }
-            for stage in ("filter", "screen")
-        }
+        usage = usage_summary(self.stages)
         in_flight = 0
         if self.database.is_file():
             db = self.connection()
@@ -141,8 +268,8 @@ class DatasetSource:
         else:
             with (self.root / "videos.jsonl").open() as stream:
                 records = [json.loads(line) for line in stream if line.strip()]
-            if any(r.get("schema") != "video_collect.video.v3" for r in records):
-                raise ValueError("viewer requires video_collect.video.v3")
+            if any(r.get("schema") != "video_curator.video.v3" for r in records):
+                raise ValueError("viewer requires video_curator.video.v3")
             origin = "videos.jsonl"
         return {
             "name": self.root.name,
@@ -173,19 +300,14 @@ class ViewerServer(ThreadingHTTPServer):
 
     def __init__(self, address, source):
         self.source = source
-        template = Path(__file__).with_name("dataset_viewer.html").read_text()
-        self.html = template.replace(
-            "__DATASET_JSON__",
-            json.dumps(
-                {
-                    "name": source.root.name,
-                    "records": [],
-                    "usage": {},
-                    "generated": "",
-                    "live": True,
-                },
-                ensure_ascii=True,
-            ).replace("<", "\\u003c"),
+        self.html = render_html(
+            {
+                "name": source.root.name,
+                "records": [],
+                "usage": {},
+                "generated": "",
+                "live": True,
+            }
         ).encode()
         super().__init__(address, ViewerHandler)
 
@@ -304,6 +426,9 @@ class ViewerHandler(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument(
+        "--output", type=Path, help="Export a static HTML snapshot instead of serving"
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument(
         "--port",
@@ -313,6 +438,9 @@ def main():
     )
     parser.add_argument("--open", action="store_true", help="Open the local browser")
     args = parser.parse_args()
+    if args.output is not None:
+        print(json.dumps(build(args.input, args.output), ensure_ascii=False, indent=2))
+        return
     if not 0 <= args.port <= 65535:
         parser.error("port must be between 0 and 65535")
     source = DatasetSource(args.input)

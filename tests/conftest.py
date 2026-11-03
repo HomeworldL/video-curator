@@ -1,12 +1,15 @@
+import importlib.util
 import shutil
 import subprocess
+from functools import lru_cache
+from pathlib import Path
 
 import pytest
 
-from video_collect.config import Runtime, Topic
-from video_collect.identity import identify
-from video_collect.jobs import Job
-from video_collect.models import DownloadResult, VideoMetadata
+from video_curator.config import Runtime, Topic
+from video_curator.identity import identify
+from video_curator.jobs import Job
+from video_curator.models import DownloadResult, VideoMetadata
 
 URL = "https://www.youtube.com/watch?v=BaW_jenozKc"
 
@@ -67,7 +70,22 @@ def collection(tmp_path, monkeypatch, tiny_video):
         shutil.copyfile(tiny_video, path)
         return DownloadResult(path=path, backend="fixture")
 
-    monkeypatch.setattr("video_collect.metadata.fetch", fetch)
-    monkeypatch.setattr("video_collect.download.obtain", obtain)
+    monkeypatch.setattr("video_curator.metadata.fetch", fetch)
+    monkeypatch.setattr("video_curator.download.obtain", obtain)
     job = Job(topic, runtime)
     return job, details, calls
+
+
+@pytest.fixture(scope="session")
+def load_script():
+    """Load repository scripts without changing sys.path or repeating import boilerplate."""
+
+    @lru_cache
+    def load(name):
+        path = Path(__file__).parents[1] / "scripts" / f"{name}.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    return load

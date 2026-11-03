@@ -7,10 +7,10 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from video_collect import export, filtering, jobs
-from video_collect.state import State
+from video_curator import export, filtering, jobs
+from video_curator.state import State
 
-VERSION = "stage-retries-and-filter-cache-v1"
+VERSION = "curator-namespace-and-state-v1"
 
 
 def upgrade(root: Path, backup: Path) -> dict:
@@ -21,8 +21,14 @@ def upgrade(root: Path, backup: Path) -> dict:
     if not database.is_file():
         raise ValueError("upgrade requires the original SQLite database")
     with jobs.locked(root):
-        task = jobs.read(root)
-        if task.get("stages", {}).get("upgrade", {}).get("version") == VERSION:
+        task = json.loads((root / "task.json").read_text())
+        old_namespace = task.get("schema") == "video_collect.task.v2"
+        if task.get("schema") not in {jobs.SCHEMA, "video_collect.task.v2"}:
+            raise ValueError("expected a v2 task snapshot")
+        if (
+            not old_namespace
+            and task.get("stages", {}).get("upgrade", {}).get("version") == VERSION
+        ):
             return {"status": "already_upgraded", "version": VERSION}
         # Back up before constructing State, whose initializer upgrades the SQL schema.
         backup.mkdir(parents=True, exist_ok=False)
@@ -32,6 +38,25 @@ def upgrade(root: Path, backup: Path) -> dict:
             with sqlite3.connect(backup / "state.sqlite") as target:
                 source.backup(target)
         try:
+            if old_namespace:
+                from video_curator.media import sha256
+
+                records = []
+                with (root / "videos.jsonl").open() as stream:
+                    for line in stream:
+                        if not line.strip():
+                            continue
+                        record = json.loads(line)
+                        if record.get("schema") != "video_collect.video.v3":
+                            raise ValueError("namespace upgrade requires v3 video records")
+                        records.append({**record, "schema": "video_curator.video.v3"})
+                # Keep the original pair-mismatch signal; do not bless a broken snapshot.
+                if records and task.get("videos_sha256") != sha256(root / "videos.jsonl"):
+                    raise ValueError("repair the snapshot pair with the old code before upgrading")
+                export._atomic_write(records, root / "videos.jsonl")
+                task["schema"] = jobs.SCHEMA
+                task["videos_sha256"] = sha256(root / "videos.jsonl")
+                export.write_json(root / "task.json", task)
             state = State(database)
             export.restore(state, root)
             if any(r["status"] == "processing" for r in state.rows()) or any(
@@ -82,6 +107,7 @@ def upgrade(root: Path, backup: Path) -> dict:
             summary = {
                 "status": "complete",
                 "version": VERSION,
+                "namespace_upgraded": old_namespace,
                 "records": len(after),
                 "retry_counters_materialized": len(state.rows()),
                 "filter_fingerprints_upgraded": len(changed),

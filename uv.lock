@@ -694,7 +694,7 @@ wheels = [
 ]
 
 [[package]]
-name = "video-collect"
+name = "video-curator"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

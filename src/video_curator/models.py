@@ -178,8 +178,8 @@ class ScreenData(Model):
 
 
 class VideoRecord(Model):
-    schema_version: Literal["video_collect.video.v3"] = Field(
-        default="video_collect.video.v3", alias="schema"
+    schema_version: Literal["video_curator.video.v3"] = Field(
+        default="video_curator.video.v3", alias="schema"
     )
     record_id: str
     identity: ManifestIdentity

@@ -2,12 +2,12 @@ import json
 
 import pytest
 
-from video_collect import search
-from video_collect.identity import identify
-from video_collect.metadata import normalize
-from video_collect.models import Candidate, CollectionError
-from video_collect.platforms.bilibili.urls import access_url
-from video_collect.state import State
+from video_curator import search
+from video_curator.identity import identify
+from video_curator.metadata import normalize
+from video_curator.models import Candidate, CollectionError
+from video_curator.platforms.bilibili.urls import access_url
+from video_curator.state import State
 
 
 @pytest.mark.parametrize(
@@ -128,7 +128,7 @@ def test_stage_selection_orders_by_record_id_and_keeps_retry_limits(tmp_path):
 
 
 def test_stage_retry_limits_are_independent_and_applied_before_limit(tmp_path):
-    from video_collect.models import VideoMetadata
+    from video_curator.models import VideoMetadata
 
     state = State(tmp_path / "state.sqlite")
     keys = []
@@ -149,7 +149,7 @@ def test_stage_retry_limits_are_independent_and_applied_before_limit(tmp_path):
 
 
 def test_legacy_database_migrates_without_charging_metadata_failures_to_download(tmp_path):
-    from video_collect.models import VideoMetadata
+    from video_curator.models import VideoMetadata
 
     path = tmp_path / "state.sqlite"
     state = State(path)
@@ -167,7 +167,7 @@ def test_legacy_database_migrates_without_charging_metadata_failures_to_download
 
 
 def test_legacy_download_errors_still_obey_retry_limit(tmp_path):
-    from video_collect.models import VideoMetadata
+    from video_curator.models import VideoMetadata
 
     state = State(tmp_path / "state.sqlite")
     url = "https://youtu.be/aaaaaaaaaaa"

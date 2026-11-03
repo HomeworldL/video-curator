@@ -12,10 +12,10 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from video_collect import export, jobs, screening
-from video_collect.config import load_topic
-from video_collect.models import ScreenPage
-from video_collect.state import State, dump
+from video_curator import export, jobs, screening
+from video_curator.config import load_topic
+from video_curator.models import ScreenPage
+from video_curator.state import State, dump
 
 
 def convert(value, config_hash):
@@ -53,14 +53,17 @@ def migrate(root, topic_path, backup):
     root, backup = root.resolve(), backup.resolve()
     with jobs.locked(root):
         before = [json.loads(line) for line in (root / "videos.jsonl").open() if line.strip()]
-        if all(r["schema"] == "video_collect.video.v3" for r in before):
+        if all(r["schema"] in {"video_curator.video.v3", "video_collect.video.v3"} for r in before):
             return {"status": "already_migrated"}
-        if any(r["schema"] != "video_collect.video.v2" for r in before):
+        if any(
+            r["schema"] not in {"video_curator.video.v2", "video_collect.video.v2"} for r in before
+        ):
             raise ValueError("expected a v2 dataset")
         if not (root / ".state/state.sqlite").is_file():
             raise ValueError("migration requires the original SQLite state")
-        state = State(root / ".state/state.sqlite")
-        original_task = jobs.read(root)
+        original_task = json.loads((root / "task.json").read_text())
+        if original_task.get("schema") not in {jobs.SCHEMA, "video_collect.task.v2"}:
+            raise ValueError("expected a v2 task snapshot")
         topic = load_topic(topic_path)
         if topic.id != original_task["topic"]["id"]:
             raise ValueError("topic mismatch")
@@ -75,21 +78,26 @@ def migrate(root, topic_path, backup):
         for name in ("videos.jsonl", "task.json"):
             shutil.copy2(root / name, backup / name)
         with (
-            sqlite3.connect(state.path) as source,
+            sqlite3.connect(
+                (root / ".state/state.sqlite").as_uri() + "?mode=ro", uri=True
+            ) as source,
             sqlite3.connect(backup / "state.sqlite") as target,
         ):
             source.backup(target)
-        values = state.screens()
-        converted = {key: convert(value, config["hash"]) for key, value in values.items()}
-        with state.connect() as db:
-            for key, value in converted.items():
-                db.execute(
-                    "UPDATE screen_results SET data_json=? WHERE resource_key=?", (dump(value), key)
-                )
-            db.execute(
-                "INSERT OR REPLACE INTO settings VALUES ('screen_config', ?)", (dump(config),)
-            )
         try:
+            state = State(root / ".state/state.sqlite")
+            values = state.screens()
+            converted = {key: convert(value, config["hash"]) for key, value in values.items()}
+            with state.connect() as db:
+                for key, value in converted.items():
+                    db.execute(
+                        "UPDATE screen_results SET data_json=? WHERE resource_key=?",
+                        (dump(value), key),
+                    )
+                db.execute(
+                    "INSERT OR REPLACE INTO settings VALUES ('screen_config', ?)", (dump(config),)
+                )
+            export.write_json(root / "task.json", {**original_task, "schema": jobs.SCHEMA})
             after, _ = export.snapshot(state, root)
             assert len(before) == len(after)
             original_by_id = {r["record_id"]: r for r in before}
@@ -114,16 +122,9 @@ def migrate(root, topic_path, backup):
             summary["migration"] = "v3_pages_preserve_legacy"
             export.write_stage(state, root, "screen", summary)
         except BaseException:
-            with state.connect() as db:
-                for key, value in values.items():
-                    db.execute(
-                        "UPDATE screen_results SET data_json=? WHERE resource_key=?",
-                        (dump(value), key),
-                    )
-                db.execute(
-                    "INSERT OR REPLACE INTO settings VALUES ('screen_config', ?)",
-                    (dump(original_task["screen_config"]),),
-                )
+            with sqlite3.connect(backup / "state.sqlite") as source:
+                with sqlite3.connect(root / ".state/state.sqlite") as target:
+                    source.backup(target)
             for name in ("videos.jsonl", "task.json"):
                 shutil.copy2(backup / name, root / name)
             raise

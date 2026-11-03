@@ -265,7 +265,7 @@ def write_stage(state: State, root: Path, stage: str, summary: dict) -> dict:
     from .jobs import read
 
     task = read(root)
-    task["schema"] = "video_collect.task.v2"
+    task["schema"] = "video_curator.task.v2"
     task["search"]["checkpoints"] = resume.pop("checkpoints")
     task.update(resume)
     if task.get("screen_config"):
@@ -318,7 +318,7 @@ def restore(state: State, root: Path):
     from .jobs import read
 
     task = read(root)
-    if task.get("schema") != "video_collect.task.v2":
+    if task.get("schema") != "video_curator.task.v2":
         raise CollectionError("invalid_task_directory", "job")
     actual_hash = sha256(root / "videos.jsonl")
     if task.get("videos_sha256") != actual_hash and (root / "videos.jsonl").stat().st_size:

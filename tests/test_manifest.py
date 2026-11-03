@@ -4,11 +4,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from video_collect import download, export, jobs, metadata, search
-from video_collect.cli import main
-from video_collect.identity import identify
-from video_collect.jobs import Job
-from video_collect.models import (
+from video_curator import download, export, jobs, metadata, search
+from video_curator.cli import main
+from video_curator.identity import identify
+from video_curator.jobs import Job
+from video_curator.models import (
     Candidate,
     CollectionError,
     SearchBatch,
@@ -67,7 +67,7 @@ def test_canonical_merge_preserves_download_and_all_old_record_ids(collection, m
     bv = "https://www.bilibili.com/video/BV17x411w7KC"
     av = "https://www.bilibili.com/video/av170001"
     details = VideoMetadata(identity=identify(bv), access_url=bv, title="robot", duration_seconds=2)
-    monkeypatch.setattr("video_collect.metadata.fetch", lambda *args: details)
+    monkeypatch.setattr("video_curator.metadata.fetch", lambda *args: details)
     with job.exclusive():
         search.import_urls(job, [bv])
         metadata.run(job, 10**9, missing_only=True)
@@ -106,7 +106,7 @@ def test_unresolved_identity_keeps_record_id_after_resolution(collection, monkey
     short = "https://b23.tv/test"
     bv = "https://www.bilibili.com/video/BV17x411w7KC"
     resolved = VideoMetadata(identity=identify(bv), access_url=bv)
-    monkeypatch.setattr("video_collect.metadata.fetch", lambda *args: resolved)
+    monkeypatch.setattr("video_curator.metadata.fetch", lambda *args: resolved)
     search.import_urls(job, [short])
     rid = job.state.get(identify(short).key)["record_id"]
     with job.exclusive():
@@ -199,11 +199,11 @@ def test_metadata_failure_is_in_record_and_success_clears_it(collection, monkeyp
     def fail(*args):
         raise CollectionError("needs_login", "metadata")
 
-    monkeypatch.setattr("video_collect.metadata.fetch", fail)
+    monkeypatch.setattr("video_curator.metadata.fetch", fail)
     with job.exclusive(), pytest.raises(CollectionError, match="needs_login"):
         metadata.run(job, 1)
     assert records(job.root)[0]["metadata"]["error"] == "needs_login"
-    monkeypatch.setattr("video_collect.metadata.fetch", lambda *args: details)
+    monkeypatch.setattr("video_curator.metadata.fetch", lambda *args: details)
     with job.exclusive():
         metadata.run(job, 1)
     assert records(job.root)[0]["metadata"]["status"] == "complete"
@@ -302,7 +302,7 @@ def test_only_manifests_do_not_claim_missing_video_already_downloaded(collection
 
 
 def test_v2_contract_has_uniform_stages_and_lossless_execution_sidecar(collection):
-    from video_collect.models import VideoRecord
+    from video_curator.models import VideoRecord
 
     job, details, _ = collection
     search.import_urls(job, [details.access_url])
@@ -319,7 +319,7 @@ def test_v2_contract_has_uniform_stages_and_lossless_execution_sidecar(collectio
         "download",
         "screening",
     }
-    assert record["schema"] == "video_collect.video.v3"
+    assert record["schema"] == "video_curator.video.v3"
     assert VideoRecord.model_validate(record).record_id == record["record_id"]
     for name in ("search", "metadata", "filter", "download", "screening"):
         assert set(record[name]) == {"status", "error", "data"}

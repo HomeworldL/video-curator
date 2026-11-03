@@ -1,18 +1,15 @@
-import importlib.util
 import json
 import shutil
 import sqlite3
-from pathlib import Path
 
 import pytest
 
-from video_collect import export, filtering, jobs, metadata, search
+from video_curator import export, filtering, jobs, metadata, search
 
-spec = importlib.util.spec_from_file_location(
-    "upgrade_dataset", Path(__file__).parents[1] / "scripts/upgrade_dataset.py"
-)
-upgrade_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(upgrade_module)
+
+@pytest.fixture
+def upgrade_module(load_script):
+    return load_script("upgrade_dataset")
 
 
 @pytest.fixture
@@ -57,7 +54,9 @@ def legacy_task(collection):
     return job, row["key"], old_hash
 
 
-def test_upgrade_preserves_decisions_and_rebuilds_without_new_requests(legacy_task, tmp_path):
+def test_upgrade_preserves_decisions_and_rebuilds_without_new_requests(
+    legacy_task, tmp_path, upgrade_module
+):
     job, key, old_hash = legacy_task
     before = (job.root / "videos.jsonl").read_bytes()
     batches = jobs.read(job.root)["filter_batches"]
@@ -81,7 +80,7 @@ def test_upgrade_preserves_decisions_and_rebuilds_without_new_requests(legacy_ta
         assert filtering.run(resumed)["cached"] == 1
 
 
-def test_upgrade_does_not_revalidate_stale_source(legacy_task, tmp_path):
+def test_upgrade_does_not_revalidate_stale_source(legacy_task, tmp_path, upgrade_module):
     job, key, old_hash = legacy_task
     with job.state.connect() as db:
         data = json.loads(
@@ -96,7 +95,7 @@ def test_upgrade_does_not_revalidate_stale_source(legacy_task, tmp_path):
 
 
 def test_upgrade_rolls_back_schema_database_and_pair_on_export_failure(
-    legacy_task, tmp_path, monkeypatch
+    legacy_task, tmp_path, monkeypatch, upgrade_module
 ):
     job, key, old_hash = legacy_task
     before = {name: (job.root / name).read_bytes() for name in ("task.json", "videos.jsonl")}
@@ -115,3 +114,46 @@ def test_upgrade_rolls_back_schema_database_and_pair_on_export_failure(
         assert "stage_attempts_json" not in {
             r[1] for r in db.execute("PRAGMA table_info(resources)")
         }
+
+
+@pytest.fixture
+def old_namespace_task(legacy_task):
+    job, key, old_hash = legacy_task
+    from video_curator.media import sha256
+
+    path = job.root / "videos.jsonl"
+    records = [json.loads(line) for line in path.open()]
+    for record in records:
+        record["schema"] = "video_collect.video.v3"
+    export._atomic_write(records, path)
+    task = jobs.read(job.root)
+    task["schema"] = "video_collect.task.v2"
+    task["videos_sha256"] = sha256(path)
+    task["stages"]["upgrade"] = {"version": "stage-retries-and-filter-cache-v1"}
+    export.write_json(job.root / "task.json", task)
+    return job, records
+
+
+def test_namespace_upgrade_preserves_video_data(old_namespace_task, tmp_path, upgrade_module):
+    job, before = old_namespace_task
+    result = upgrade_module.upgrade(job.root, tmp_path / "backup")
+    assert result["namespace_upgraded"] is True
+    after = [json.loads(line) for line in (job.root / "videos.jsonl").open()]
+    assert after == [{**r, "schema": "video_curator.video.v3"} for r in before]
+    assert jobs.read(job.root)["schema"] == "video_curator.task.v2"
+    assert upgrade_module.upgrade(job.root, tmp_path / "backup")["status"] == "already_upgraded"
+
+
+def test_namespace_upgrade_failure_restores_old_pair(
+    old_namespace_task, tmp_path, upgrade_module, monkeypatch
+):
+    job, _ = old_namespace_task
+    before = {name: (job.root / name).read_bytes() for name in ("task.json", "videos.jsonl")}
+
+    def fail(*args, **kwargs):
+        raise OSError("simulated namespace failure")
+
+    monkeypatch.setattr(export, "snapshot", fail)
+    with pytest.raises(OSError, match="namespace failure"):
+        upgrade_module.upgrade(job.root, tmp_path / "backup")
+    assert before == {name: (job.root / name).read_bytes() for name in before}

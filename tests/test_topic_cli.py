@@ -3,10 +3,10 @@ import json
 import pytest
 import yaml
 
-from video_collect import jobs, search
-from video_collect.cli import main
-from video_collect.config import Runtime, resolve_topic
-from video_collect.models import Candidate, CollectionError, SearchBatch
+from video_curator import jobs, search
+from video_curator.cli import main
+from video_curator.config import Runtime, resolve_topic
+from video_curator.models import Candidate, CollectionError, SearchBatch
 
 
 @pytest.mark.parametrize("after_command", [False, True])

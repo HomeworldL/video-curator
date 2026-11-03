@@ -4,13 +4,13 @@ import shutil
 import pytest
 from PIL import Image
 
-from video_collect import download, export, filtering, jobs, preview, screening
-from video_collect.cli import main
-from video_collect.config import Runtime, Topic
-from video_collect.identity import identify
-from video_collect.models import Candidate, CollectionError, DownloadResult, VideoMetadata
-from video_collect.providers import doubao
-from video_collect.state import State
+from video_curator import download, export, filtering, jobs, preview, screening
+from video_curator.cli import main
+from video_curator.config import Runtime, Topic
+from video_curator.identity import identify
+from video_curator.models import Candidate, CollectionError, DownloadResult, VideoMetadata
+from video_curator.providers import doubao
+from video_curator.state import State
 
 
 @pytest.fixture
@@ -61,8 +61,8 @@ def setup_screen(tmp_path, monkeypatch, tiny_video):
             "usage": {"prompt_tokens": 1000, "completion_tokens": 100, "total_tokens": 1100},
         }
 
-    monkeypatch.setattr("video_collect.download.obtain", download)
-    monkeypatch.setattr("video_collect.providers.doubao.complete_screen", judge)
+    monkeypatch.setattr("video_curator.download.obtain", download)
+    monkeypatch.setattr("video_curator.providers.doubao.complete_screen", judge)
 
     def add(n=0, decision="keep"):
         url = f"https://www.youtube.com/watch?v={n:011d}"
@@ -133,7 +133,7 @@ def test_failed_response_explicit_retry_reuses_preview(setup_screen, monkeypatch
     root, topic, runtime, state, calls, add = setup_screen
     key = add()
     monkeypatch.setattr(
-        "video_collect.providers.doubao.complete_screen",
+        "video_curator.providers.doubao.complete_screen",
         lambda *a: {"result": {"grade": "nonsense"}},
     )
     assert screening.run(root, topic, runtime)["outcomes"] == {"error": 1}
@@ -141,7 +141,7 @@ def test_failed_response_explicit_retry_reuses_preview(setup_screen, monkeypatch
     assert screening.run(root, topic, runtime)["error_records_skipped"] == 1
     assert calls["download"] == 1
     monkeypatch.setattr(
-        "video_collect.providers.doubao.complete_screen",
+        "video_curator.providers.doubao.complete_screen",
         lambda *a: {
             "result": {
                 "pages": [
@@ -181,7 +181,7 @@ def test_screen_cli_uses_its_own_session(setup_screen, monkeypatch):
     root, topic, runtime, state, calls, add = setup_screen
     add()
     monkeypatch.setattr(
-        "video_collect.cli.Job", lambda *a, **kw: pytest.fail("Generic Job constructed for screen")
+        "video_curator.cli.Job", lambda *a, **kw: pytest.fail("Generic Job constructed for screen")
     )
     assert main(["screen", "--input", str(root)]) == 0
     assert calls["vlm"] == 1
@@ -215,7 +215,7 @@ def test_rate_limit_stops_new_requests(setup_screen, monkeypatch):
     def fail(*a):
         raise CollectionError("rate_limited", "screen", diagnostics={"http_status": 429})
 
-    monkeypatch.setattr("video_collect.providers.doubao.complete_screen", fail)
+    monkeypatch.setattr("video_curator.providers.doubao.complete_screen", fail)
     result = screening.run(root, topic, runtime)
     assert result["calls"] == result["processed"] == 1
     assert result["stopped"] == "rate_limited"
@@ -239,7 +239,7 @@ def test_frame_failure_cannot_become_low_grade(setup_screen, monkeypatch):
 
 
 def test_default_download_downloads_only_screen_priority(setup_screen, monkeypatch):
-    from video_collect.jobs import Job
+    from video_curator.jobs import Job
 
     root, topic, runtime, state, calls, add = setup_screen
     key = add()
@@ -314,7 +314,7 @@ def test_unknown_visual_request_survives_handoff_without_resend(
         calls["vlm"] += 1
         raise CollectionError("outcome_unknown", "vlm")
 
-    monkeypatch.setattr("video_collect.providers.doubao.complete_screen", unknown)
+    monkeypatch.setattr("video_curator.providers.doubao.complete_screen", unknown)
     screening.run(root, topic, runtime)
     assert state.screens()[key]["error"] == "outcome_unknown"
     moved = tmp_path / "handoff"
@@ -355,7 +355,7 @@ def test_configurable_frames_layout_and_model_protocol(setup_screen, monkeypatch
             }
         }
 
-    monkeypatch.setattr("video_collect.providers.doubao.complete_screen", judge)
+    monkeypatch.setattr("video_curator.providers.doubao.complete_screen", judge)
     assert screening.run(root, topic, runtime)["calls"] == 1
     assert state.screens()[key]["status"] == "complete"
     assert screening.run(root, topic, runtime)["cached"] == 1
@@ -515,9 +515,7 @@ def test_page_mapping_rejects_duplicate_missing_unknown(numbers):
         screening.validate_pages(response, pages)
 
 
-def test_legacy_migration_reuses_results_until_explicit_resampling(setup_screen):
-    import importlib.util
-    from pathlib import Path
+def test_legacy_migration_reuses_results_until_explicit_resampling(setup_screen, load_script):
 
     root, topic, runtime, state, calls, add = setup_screen
     key = add()
@@ -532,11 +530,7 @@ def test_legacy_migration_reuses_results_until_explicit_resampling(setup_screen)
     value["result"] = {k: page[k] for k in ("grade", "reason", "evidence_frames")}
     topic.screen.preview.segment_seconds = 1
     config = screening.screen_descriptor(topic)
-    spec = importlib.util.spec_from_file_location(
-        "migration", Path(__file__).resolve().parents[1] / "scripts/migrate_screen_pages.py"
-    )
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
+    migration = load_script("migrate_screen_pages")
     converted = migration.convert(value, config["hash"])
     assert converted["config_hash"] != config["hash"]
     assert converted["pages"][0]["reason"] == page["reason"]

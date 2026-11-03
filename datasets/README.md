@@ -1,11 +1,11 @@
 # 本地数据集
 
-当前任务为 `labubu-bilibili/`，视频记录使用 `video_collect.video.v3`，任务快照使用 `video_collect.task.v2`；它们是不同数据对象的版本号。旧结构备份保存在仓库 `tmp/dataset-backups/`。
+当前任务为 `labubu-bilibili/`，视频记录使用 `video_curator.video.v3`，任务快照使用 `video_curator.task.v2`；它们是不同数据对象的版本号。旧结构备份保存在仓库 `tmp/dataset-backups/`。
 
 新任务从统一 CLI 创建：
 
 ```bash
-env -u PYTHONPATH .venv/bin/python -m video_collect.cli search \
+env -u PYTHONPATH .venv/bin/python -m video_curator.cli search \
   --topic configs/topics/labubu.yaml --platform bilibili \
   --mode native --all-pages --page-size 50 \
   --output datasets/labubu-bilibili
@@ -21,7 +21,7 @@ env -u PYTHONPATH .venv/bin/python -m video_collect.cli search \
 
 ## 离线升级
 
-较旧的 v3 任务可用以下命令统一阶段重试计数和等价文本筛选指纹：
+较旧的 v3 任务可用以下命令迁移旧包名的 schema 命名空间，并统一阶段重试计数和等价文本筛选指纹：
 
 ```bash
 uv run python scripts/upgrade_dataset.py \
